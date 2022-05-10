@@ -18,9 +18,9 @@ class Breadcrumbs
 
       protected def wrap_item(url, text, options)
         if url
-          tag(:a, text, options.merge(href: url))
+          tag(:a, text, options.merge(href: url).merge(class: "ml-4 text-sm font-medium text-gray-500 hover:text-gray-700 #{options["class"]}"))
         else
-          tag(:span, text, options)
+          tag(:div, text, {class: "text-center ml-4 text-sm font-medium text-gray-500 hover:text-gray-700 #{options["class"]}"})
         end
       end
     end

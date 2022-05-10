@@ -8,10 +8,15 @@ require "breadcrumbs/render"
 require "breadcrumbs/action_controller_ext" if defined?(ActionController)
 
 class Breadcrumbs
-  attr_accessor :items
+  attr_reader :current_user, :name
 
-  def initialize # :nodoc:
-    self.items = []
+  def initialize(current_user, name = nil) # :nodoc:
+    @current_user = current_user
+    if name.present?
+      @name = "user:#{@current_user.id}:#{name}"
+    else
+      @name = "user:#{@current_user.id}:breadcrumbs"
+    end
   end
 
   # Add a new breadcrumbs.
@@ -26,7 +31,28 @@ class Breadcrumbs
   def add(text, url = nil, options = {})
     options = {i18n: true}.merge(options)
     text = translate(text) if options.delete(:i18n)
-    items << [text.to_s, url, options]
+    breadcrumb_hash = {"text" => text, "url" => url}.merge(options).with_indifferent_access
+
+    if items.exclude?(breadcrumb_hash)
+      $redis.rpush(@name, breadcrumb_hash.to_json)
+    else
+      unless items.find_index(breadcrumb_hash) == (items.size - 1)
+        elements = items[0..items.find_index(breadcrumb_hash)]
+        self.reset
+        elements.each do |element|
+          $redis.rpush(@name, element.to_json)
+        end
+      end
+    end
+  end
+
+  def items
+    hashes = $redis.lrange(@name, 0, -1)
+    hashes.map! { |x| JSON.parse(x) }
+  end
+
+  def reset
+    $redis.del(@name)
   end
 
   alias << add
@@ -68,16 +94,16 @@ class Breadcrumbs
     return scope if scope.match?(/\A[\s.]+\z/)
 
     text = begin
-      I18n.t(scope, scope: "breadcrumbs", raise: true)
-    rescue StandardError
-      nil
-    end
+             I18n.t(scope, scope: "breadcrumbs", raise: true)
+           rescue StandardError
+             nil
+           end
 
     text ||= begin
-      I18n.t(scope, default: scope.to_s)
-    rescue StandardError
-      scope
-    end
+               I18n.t(scope, default: scope.to_s)
+             rescue StandardError
+               scope
+             end
 
     text
   end

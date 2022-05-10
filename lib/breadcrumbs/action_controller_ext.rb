@@ -6,8 +6,8 @@ class Breadcrumbs
       base.send :helper_method, :breadcrumbs
     end
 
-    def breadcrumbs
-      @breadcrumbs ||= Breadcrumbs.new
+    def breadcrumbs(name=nil)
+      @breadcrumbs ||= Breadcrumbs.new(current_user, name)
     end
   end
 end
